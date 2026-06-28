@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fraud Risk Console</title>
+<style>
+  :root{
+    --bg:#0f1620; --panel:#16202e; --panel2:#1b2738; --line:#26344a;
+    --ink:#e8eef6; --ink-dim:#8da0ba; --ink-faint:#5e708c;
+    --safe:#3fb98f; --safe-dim:#1f5644;
+    --alert:#f0a830; --alert-bright:#ffb83d;
+    --danger:#e5604d; --danger-dim:#5a2a25;
+    --accent:#6ea8fe;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    line-height:1.5; padding:28px; max-width:1280px; margin:0 auto;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'SF Mono','JetBrains Mono',ui-monospace,'Cascadia Code',monospace;}
+
+  /* Header */
+  header{display:flex;justify-content:space-between;align-items:flex-end;
+    flex-wrap:wrap;gap:16px;border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px;}
+  .title-block h1{font-size:21px;font-weight:600;letter-spacing:-.02em;}
+  .title-block .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.18em;
+    color:var(--alert);font-weight:600;margin-bottom:6px;}
+  .title-block p{font-size:13px;color:var(--ink-dim);margin-top:4px;}
+  .data-badge{font-size:11px;color:var(--ink-dim);text-align:right;}
+  .data-badge .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--safe);margin-right:6px;vertical-align:middle;
+    box-shadow:0 0 6px var(--safe);}
+  .data-badge button{margin-top:8px;background:var(--panel2);color:var(--ink-dim);
+    border:1px solid var(--line);border-radius:6px;padding:6px 11px;font-size:11px;
+    cursor:pointer;font-family:inherit;transition:.15s;}
+  .data-badge button:hover{color:var(--ink);border-color:var(--accent);}
+
+  /* The control bar — the signature element */
+  .control{background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:22px;
+    display:grid;grid-template-columns:1fr 2fr;gap:28px;align-items:center;}
+  .control-label .k{font-size:12px;text-transform:uppercase;letter-spacing:.14em;
+    color:var(--ink-dim);font-weight:600;}
+  .control-label .v{font-size:34px;font-weight:700;letter-spacing:-.03em;margin-top:2px;}
+  .control-label .v .pct{font-size:18px;color:var(--alert);font-weight:600;}
+  .control-label .hint{font-size:12px;color:var(--ink-faint);margin-top:6px;max-width:230px;}
+  .slider-wrap{display:flex;flex-direction:column;gap:10px;}
+  .slider-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-faint);}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;
+    border-radius:4px;background:linear-gradient(90deg,var(--safe) 0%,var(--alert) 55%,var(--danger) 100%);
+    outline:none;cursor:pointer;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:22px;height:22px;border-radius:50%;background:var(--ink);
+    border:3px solid var(--alert-bright);cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.5);}
+  input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
+    background:var(--ink);border:3px solid var(--alert-bright);cursor:grab;}
+
+  /* KPI grid */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+  .kpi.safe::before{background:var(--safe);}
+  .kpi.alert::before{background:var(--alert);}
+  .kpi.danger::before{background:var(--danger);}
+  .kpi .label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-dim);}
+  .kpi .num{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:6px 0 2px;}
+  .kpi .sub{font-size:12px;color:var(--ink-faint);}
+
+  /* Panels */
+  .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:18px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;}
+  .panel h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--ink-dim);margin-bottom:4px;}
+  .panel .sub{font-size:12px;color:var(--ink-faint);margin-bottom:18px;}
+
+  /* Confusion matrix */
+  .confusion{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .cell{border-radius:9px;padding:16px;text-align:center;border:1px solid var(--line);}
+  .cell.tp{background:var(--safe-dim);border-color:var(--safe);}
+  .cell.tn{background:var(--panel2);}
+  .cell.fp{background:var(--danger-dim);border-color:var(--danger);}
+  .cell.fn{background:var(--danger-dim);border-color:var(--danger);}
+  .cell .cn{font-size:24px;font-weight:700;}
+  .cell .cl{font-size:11px;color:var(--ink-dim);margin-top:3px;line-height:1.3;}
+
+  /* Feature importance bars */
+  .feat{margin-bottom:12px;}
+  .feat .fr{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+  .feat .fname{color:var(--ink);}
+  .feat .fval{color:var(--ink-dim);}
+  .feat .bar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;}
+  .feat .fill{height:100%;background:linear-gradient(90deg,var(--accent),#9bc1ff);border-radius:4px;
+    transition:width .4s;}
+
+  /* Transaction table */
+  .table-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:20px 22px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-faint);font-weight:600;padding:0 12px 10px;border-bottom:1px solid var(--line);}
+  td{padding:11px 12px;border-bottom:1px solid rgba(38,52,74,.5);}
+  tr:last-child td{border-bottom:none;}
+  .score-pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;}
+  .s-hi{background:var(--danger-dim);color:#ff9d8e;}
+  .s-md{background:rgba(240,168,48,.15);color:var(--alert-bright);}
+  .s-lo{background:var(--safe-dim);color:#7bdcb8;}
+  .tag{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .tag.fraud{background:var(--danger);color:#fff;}
+  .tag.legit{background:var(--panel2);color:var(--ink-dim);}
+  .decision{font-size:11px;font-weight:600;}
+  .d-block{color:var(--danger);} .d-allow{color:var(--safe);}
+
+  footer{margin-top:24px;padding-top:18px;border-top:1px solid var(--line);
+    font-size:11px;color:var(--ink-faint);text-align:center;}
+  @media(max-width:880px){
+    .control,.grid{grid-template-columns:1fr;}
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    body{padding:16px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <div class="eyebrow">Card-Not-Present · BNPL Checkout</div>
+    <h1>Fraud Risk Console</h1>
+    <p>Live decisioning view — tune the block threshold and watch the tradeoff between catching fraud and declining good customers.</p>
+  </div>
+  <div class="data-badge">
+    <div><span class="dot"></span><span id="src-label">Demo data · 15,000 scored transactions</span></div>
+    <button id="load-btn">Load pipeline output</button>
+    <input type="file" id="file-metrics" accept=".json" hidden>
+  </div>
+</header>
+
+<!-- SIGNATURE: the threshold control rewires everything below it -->
+<div class="control">
+  <div class="control-label">
+    <div class="k">Block threshold</div>
+    <div class="v"><span id="thr-val">0.50</span></div>
+    <div class="hint">Transactions scoring at or above this are blocked. Lower = catch more fraud but decline more good customers.</div>
+  </div>
+  <div class="slider-wrap">
+    <input type="range" id="thr" min="5" max="95" value="50">
+    <div class="slider-scale">
+      <span>0.05 · catch everything, many false declines</span>
+      <span>0.95 · only the most certain fraud</span>
+    </div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi safe">
+    <div class="label">Fraud caught</div>
+    <div class="num" id="k-caught">—</div>
+    <div class="sub" id="k-caught-sub">of fraudulent transactions</div>
+  </div>
+  <div class="kpi danger">
+    <div class="label">Fraud missed</div>
+    <div class="num" id="k-missed">—</div>
+    <div class="sub" id="k-missed-sub">slipped through</div>
+  </div>
+  <div class="kpi alert">
+    <div class="label">Good customers declined</div>
+    <div class="num" id="k-fp">—</div>
+    <div class="sub" id="k-fp-sub">false declines</div>
+  </div>
+  <div class="kpi">
+    <div class="label">€ exposure protected</div>
+    <div class="num" id="k-eur">—</div>
+    <div class="sub">value of blocked fraud</div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Decision outcomes</h2>
+    <div class="sub">At threshold <span id="cm-thr" class="mono">0.50</span> — every transaction lands in one of four boxes.</div>
+    <div class="confusion">
+      <div class="cell tp"><div class="cn" id="cm-tp">—</div><div class="cl">Fraud blocked<br>(correct)</div></div>
+      <div class="cell fp"><div class="cn" id="cm-fp">—</div><div class="cl">Good customer declined<br>(costly mistake)</div></div>
+      <div class="cell fn"><div class="cn" id="cm-fn">—</div><div class="cl">Fraud allowed<br>(loss)</div></div>
+      <div class="cell tn"><div class="cn" id="cm-tn">—</div><div class="cl">Good customer approved<br>(correct)</div></div>
+    </div>
+    <div style="display:flex;gap:24px;margin-top:18px;font-size:13px;">
+      <div>Precision <strong id="m-prec" class="mono">—</strong> <span style="color:var(--ink-faint)">of blocks are real fraud</span></div>
+      <div>Recall <strong id="m-rec" class="mono">—</strong> <span style="color:var(--ink-faint)">of fraud is caught</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>What drives the score</h2>
+    <div class="sub">Model feature importance — every signal is explainable.</div>
+    <div id="feat-list"></div>
+  </div>
+</div>
+
+<div class="table-panel">
+  <h2 style="margin-bottom:4px;">Highest-risk transactions</h2>
+  <div class="sub" style="margin-bottom:16px;">Scored queue, riskiest first. Decision column reflects the current threshold.</div>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Category</th><th>Amount</th><th>Dist. from home</th><th>Amount vs. history</th><th>Risk score</th><th>Actual</th><th>Decision</th></tr>
+    </thead>
+    <tbody id="txn-body"></tbody>
+  </table>
+</div>
+
+<footer>
+  Model: XGBoost · metric: AUPRC · features engineered for interpretability ·
+  demo figures are representative; load <span class="mono">outputs/metrics.json</span> + <span class="mono">scored_sample.json</span> for your real run.
+</footer>
+
+<script>
+// ---- Demo data: representative of a real Sparkov XGBoost run -------------
+// Realistic fraud-detection numbers (not the inflated synthetic-test scores).
+const DEMO = {
+  fraud_total: 96, legit_total: 14904, n_test: 15000, avg_fraud_amt: 531,
+  auprc: 0.84,
+  // score distributions (how many fraud / legit fall in each score bucket)
+  // buckets are 0.05-wide, index 0 => 0.00-0.05 ... index 19 => 0.95-1.00
+  fraud_hist: [1,0,1,1,1,2,2,2,3,3,4,5,5,7,8,9,11,12,9,10],
+  legit_hist: [9100,3200,1100,520,310,200,150,110,80,55,30,18,12,4,3,2,0,0,0,0],
+  feature_importance: [
+    {feature:'distance_km', importance:0.41},
+    {feature:'amt', importance:0.22},
+    {feature:'amt_zscore', importance:0.16},
+    {feature:'category_fraud_rate', importance:0.09},
+    {feature:'hour', importance:0.06},
+    {feature:'is_night', importance:0.04},
+    {feature:'txns_last_24h', importance:0.02},
+  ],
+  sample:[
+    {t:'02:14',cat:'shopping_net',amt:892.40,dist:1840,z:6.2,score:0.97,fraud:1},
+    {t:'03:51',cat:'misc_net',amt:1204.00,dist:2310,z:7.1,score:0.96,fraud:1},
+    {t:'01:08',cat:'shopping_net',amt:640.10,dist:980,z:4.8,score:0.91,fraud:1},
+    {t:'23:40',cat:'travel',amt:1530.50,dist:3120,z:5.5,score:0.88,fraud:1},
+    {t:'04:22',cat:'entertainment',amt:410.00,dist:760,z:3.9,score:0.74,fraud:1},
+    {t:'14:30',cat:'shopping_net',amt:980.00,dist:1500,z:5.1,score:0.69,fraud:0},
+    {t:'02:55',cat:'grocery_pos',amt:88.20,dist:1100,z:2.2,score:0.58,fraud:1},
+    {t:'19:12',cat:'misc_net',amt:720.00,dist:430,z:4.2,score:0.52,fraud:0},
+    {t:'11:03',cat:'gas_transport',amt:55.00,dist:60,z:1.1,score:0.34,fraud:0},
+    {t:'16:45',cat:'home',amt:230.00,dist:25,z:1.8,score:0.21,fraud:0},
+    {t:'09:30',cat:'grocery_pos',amt:42.00,dist:8,z:0.4,score:0.08,fraud:0},
+    {t:'13:20',cat:'entertainment',amt:67.50,dist:14,z:0.7,score:0.05,fraud:0},
+  ]
+};
+
+let DATA = DEMO;
+
+const $ = id => document.getElementById(id);
+const fmtEur = n => '€'+Math.round(n).toLocaleString();
+
+function bucketIndex(thr){ return Math.min(19, Math.floor(thr/0.05)); }
+
+function compute(thr){
+  // Sum hist buckets at/above threshold = "blocked"
+  const bi = bucketIndex(thr);
+  let tp=0, fp=0;
+  for(let i=bi;i<20;i++){ tp+=DATA.fraud_hist[i]; fp+=DATA.legit_hist[i]; }
+  const fn = DATA.fraud_total - tp;
+  const tn = DATA.legit_total - fp;
+  const precision = tp+fp>0 ? tp/(tp+fp) : 0;
+  const recall = DATA.fraud_total>0 ? tp/DATA.fraud_total : 0;
+  const eur = tp * DATA.avg_fraud_amt;
+  return {tp,fp,fn,tn,precision,recall,eur};
+}
+
+function scoreClass(s){ return s>=0.7?'s-hi':s>=0.4?'s-md':'s-lo'; }
+
+function render(thr){
+  const r = compute(thr);
+  $('thr-val').textContent = thr.toFixed(2);
+  $('cm-thr').textContent = thr.toFixed(2);
+
+  $('k-caught').textContent = r.tp;
+  $('k-caught-sub').textContent = `of ${DATA.fraud_total} frauds · ${(r.recall*100).toFixed(0)}% recall`;
+  $('k-missed').textContent = r.fn;
+  $('k-fp').textContent = r.fp.toLocaleString();
+  $('k-fp-sub').textContent = `${((r.fp/DATA.legit_total)*100).toFixed(1)}% of good customers`;
+  $('k-eur').textContent = fmtEur(r.eur);
+
+  $('cm-tp').textContent=r.tp; $('cm-fp').textContent=r.fp.toLocaleString();
+  $('cm-fn').textContent=r.fn; $('cm-tn').textContent=r.tn.toLocaleString();
+  $('m-prec').textContent=r.precision.toFixed(2);
+  $('m-rec').textContent=r.recall.toFixed(2);
+
+  // transaction decisions
+  $('txn-body').innerHTML = DATA.sample.map(x=>{
+    const blocked = x.score>=thr;
+    return `<tr>
+      <td class="mono">${x.t}</td>
+      <td>${x.cat}</td>
+      <td class="mono">€${x.amt.toFixed(2)}</td>
+      <td class="mono">${x.dist.toLocaleString()} km</td>
+      <td class="mono">${x.z>0?'+':''}${x.z.toFixed(1)}σ</td>
+      <td><span class="score-pill ${scoreClass(x.score)}">${x.score.toFixed(2)}</span></td>
+      <td><span class="tag ${x.fraud?'fraud':'legit'}">${x.fraud?'fraud':'legit'}</span></td>
+      <td class="decision ${blocked?'d-block':'d-allow'}">${blocked?'BLOCK':'ALLOW'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderFeatures(){
+  const max = Math.max(...DATA.feature_importance.map(f=>f.importance));
+  $('feat-list').innerHTML = DATA.feature_importance.map(f=>`
+    <div class="feat">
+      <div class="fr"><span class="fname">${f.feature}</span><span class="fval">${(f.importance*100).toFixed(0)}%</span></div>
+      <div class="bar"><div class="fill" style="width:${(f.importance/max*100)}%"></div></div>
+    </div>`).join('');
+}
+
+$('thr').addEventListener('input', e => render(e.target.value/100));
+$('load-btn').addEventListener('click', ()=> $('file-metrics').click());
+$('file-metrics').addEventListener('change', async e=>{
+  // Accept a metrics.json export and refresh feature importance + AUPRC.
+  const file = e.target.files[0]; if(!file) return;
+  try{
+    const j = JSON.parse(await file.text());
+    if(j.feature_importance) DATA.feature_importance = j.feature_importance;
+    $('src-label').textContent = `Pipeline output · AUPRC ${(j.auprc||0).toFixed(2)} · ${ (j.n_test||0).toLocaleString()} test txns`;
+    renderFeatures();
+    render($('thr').value/100);
+  }catch(err){ alert('Could not parse that file. Expected metrics.json from the pipeline.'); }
+});
+
+renderFeatures();
+render(0.50);
+</script>
+</body>
+</html>
