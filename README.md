@@ -1,4 +1,5 @@
 # Payment Fraud Detection Dashboard
+dashboardlink: https://kundukamal.github.io/Payment-Fraud-Detection-Dashboard/dashboard.html
 
 A card-not-present (CNP) fraud detection pipeline and interactive dashboard, built
 around the kind of checkout fraud a BNPL provider faces. Two parts:
